@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Отладчик односвязного списка</title>
+<style>
+:root{--bg:#f6f4ef;--fg:#1d2230;--muted:#6b7285;--card:#fffdf8;--line:#d9d4c7;--code:#fbfaf6;--hl:#ffe9a8;--head:#2f6fdb;--kept:#1f8f5a;--cur:#d9731a;--next:#8a4fd1;--del:#c8372d;--ok:#1f8f5a;--chg:#fff0c2;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171f;--fg:#e8e9ee;--muted:#98a0b3;--card:#1c2029;--line:#2f3544;--code:#181b23;--hl:#5a4a12;--head:#6aa0ff;--kept:#4fd08e;--cur:#ffa24d;--next:#b98cf2;--del:#ff7a6e;--ok:#4fd08e;--chg:#4a3d12;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#14171f;--fg:#e8e9ee;--muted:#98a0b3;--card:#1c2029;--line:#2f3544;--code:#181b23;--hl:#5a4a12;--head:#6aa0ff;--kept:#4fd08e;--cur:#ffa24d;--next:#b98cf2;--del:#ff7a6e;--ok:#4fd08e;--chg:#4a3d12;color-scheme:dark}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:920px;margin:0 auto;padding:16px 14px 40px}
+h1{font-size:1.3rem;margin:0 0 4px}
+h2{font-size:1rem;margin:0 0 8px}
+p.sub{margin:0 0 14px;color:var(--muted)}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,input,select{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 12px;min-height:40px}
+button{cursor:pointer}
+button.primary{background:var(--head);color:#fff;border-color:transparent}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--head);outline-offset:2px}
+input[type=text]{flex:1 1 180px;min-width:0}
+input[type=number]{width:90px}
+input[type=range]{flex:1 1 140px;padding:0}
+label.chk{display:flex;gap:6px;align-items:center}
+.msg{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--chg);min-height:2.6em}
+.code{background:var(--code);border:1px solid var(--line);border-radius:8px;overflow-x:auto;padding:6px 0;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.ln{display:flex;white-space:pre;padding:0 10px;border-left:3px solid transparent}
+.ln i{display:inline-block;width:2.2em;color:var(--muted);font-style:normal;user-select:none}
+.ln.on{background:var(--hl);border-left-color:var(--cur)}
+.chainwrap{overflow-x:auto;padding:4px 0 6px}
+.chain{display:flex;align-items:flex-start;gap:6px;width:max-content;min-height:118px}
+.node{width:104px;border:2px solid var(--line);border-radius:10px;background:var(--bg);padding:6px;text-align:center}
+.node .a{font:11px ui-monospace,Menlo,Consolas,monospace;color:var(--muted)}
+.node .v{font-size:1.6rem;font-weight:700;line-height:1.2}
+.node .n{font:11px ui-monospace,Menlo,Consolas,monospace;color:var(--muted)}
+.node.detached{border-style:dashed;border-color:var(--del)}
+.node.deleted{opacity:.55;border-style:dotted;border-color:var(--del)}
+.node.deleted .v{text-decoration:line-through}
+.arr{align-self:center;font-size:1.4rem;color:var(--muted)}
+.nil{align-self:center;font:12px ui-monospace,Menlo,Consolas,monospace;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-top:4px;min-height:22px}
+.chip{font:11px ui-monospace,Menlo,Consolas,monospace;color:#fff;border-radius:6px;padding:1px 5px}
+.chip.head{background:var(--head)}.chip.last_kept{background:var(--kept)}.chip.current{background:var(--cur)}.chip.next{background:var(--next)}
+.sub2{font-size:.85rem;color:var(--muted);margin:6px 0 2px}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+td,th{padding:5px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+td.mono{font:12.5px ui-monospace,Menlo,Consolas,monospace}
+tr.chg td{background:var(--chg)}
+.bad{color:var(--del);font-weight:600}.good{color:var(--ok);font-weight:600}
+.res{margin-top:8px}
+@media (prefers-reduced-motion:no-preference){.ln,.node{transition:background .15s,border-color .15s}}
+</style>
+</head>
+<body>
+<main>
+<h1>Отладчик односвязного списка</h1>
+<p class="sub">Функция выполняется по шагам: видно строку кода, значения переменных и узлы с их адресами.</p>
+
+<section>
+<h2>Список для проверки</h2>
+<div class="row">
+<input type="text" id="inp" value="5 7 6 9 1 2" aria-label="Значения списка через пробел" inputmode="text">
+<button class="primary" id="apply">Применить</button>
+<button id="rnd">Случайный список</button>
+</div>
+<div class="row" style="margin-top:8px">
+<label class="chk"><input type="checkbox" id="bug"> Версия с ошибкой: previous_value берётся из last_kept</label>
+</div>
+</section>
+
+<section>
+<h2>Код</h2>
+<div class="code" id="code" role="region" aria-label="Код функции"></div>
+<div class="msg" id="msg" aria-live="polite"></div>
+<div class="row" style="margin-top:8px">
+<button id="first" aria-label="В начало">⏮</button>
+<button id="back">Назад</button>
+<button id="play" class="primary">Пуск</button>
+<button id="fwd">Шаг</button>
+<select id="spd" aria-label="Скорость"><option value="1100">Медленно</option><option value="600" selected>Средне</option><option value="250">Быстро</option></select>
+</div>
+<div class="row" style="margin-top:8px"><input type="range" id="sl" min="0" value="0" aria-label="Номер шага"><span id="cnt"></span></div>
+</section>
+
+<section>
+<h2>Список в памяти</h2>
+<div class="chainwrap"><div class="chain" id="chain"></div></div>
+<div class="sub2" id="offtitle"></div>
+<div class="chainwrap"><div class="chain" id="off" style="min-height:0"></div></div>
+</section>
+
+<section>
+<h2>Переменные</h2>
+<table><thead><tr><th>Имя</th><th>Значение</th></tr></thead><tbody id="vars"></tbody></table>
+</section>
+
+<section>
+<h2>Автопроверка на случайных списках</h2>
+<div class="row">
+<span>Тестов:</span><input type="number" id="tn" value="500" min="1" max="5000">
+<button class="primary" id="run">Проверить</button>
+<button id="showfail" hidden>Показать провал в отладчике</button>
+</div>
+<div class="res" id="res"></div>
+</section>
+</main>
+
+<script>
+const CODE=[
+"Node* remove_smaller_than_previous(Node* head) {",
+"  if (head == nullptr) {",
+"    return nullptr;",
+"  }",
+"  int previous_value = head->value;",
+"  Node* last_kept = head;",
+"  Node* current = head->next;",
+"  while (current != nullptr) {",
+"    Node* next = current->next;",
+"    const int current_value = current->value;",
+"    if (current_value < previous_value) {",
+"      last_kept->next = next;",
+"      delete current;",
+"    } else {",
+"      last_kept = current;",
+"    }",
+"    previous_value = current_value;",
+"    current = next;",
+"  }",
+"  return head;",
+"}"];
+const BUG_LINE="    previous_value = last_kept->value;";
+const PTRS=["head","last_kept","current","next"];
+const ORDER=["head","previous_value","last_kept","current","next","current_value"];
+
+function simulate(vals,buggy){
+  const nodes=vals.map((v,i)=>({id:i,value:v,addr:0x1000+((i*37+11)%97)*16,next:i+1<vals.length?i+1:null,deleted:false}));
+  const vars={head:vals.length?0:null,previous_value:undefined,last_kept:undefined,current:undefined,next:undefined,current_value:undefined};
+  const steps=[];
+  const S=(line,text)=>steps.push({line,text,nodes:nodes.map(n=>({...n})),vars:{...vars}});
+  const hx=id=>'0x'+nodes[id].addr.toString(16);
+  S(0,'Функция вызвана: head указывает на первый узел'+(vals.length?'.':', но список пуст.'));
+  if(vars.head===null){
+    S(1,'head == nullptr, условие истинно.');
+    S(2,'Возвращаем nullptr: список пустой.');
+    return {steps,result:[]};
+  }
+  S(1,'head != nullptr, условие ложно, идём дальше.');
+  vars.previous_value=nodes[vars.head].value;
+  S(4,'previous_value = '+vars.previous_value+': запоминаем значение головы. Голова удалена быть не может, у неё нет предыдущего.');
+  vars.last_kept=vars.head;
+  S(5,'last_kept указывает на голову: это последний узел, который точно останется.');
+  vars.current=nodes[vars.head].next;
+  S(6,'current переходит ко второму узлу'+(vars.current===null?' (его нет, список из одного элемента).':'.'));
+  for(;;){
+    S(7,vars.current!==null?'current != nullptr, заходим в тело цикла.':'current == nullptr: дошли до конца, цикл закончен.');
+    if(vars.current===null)break;
+    vars.next=nodes[vars.current].next;
+    S(8,'next запоминает адрес следующего узла: '+(vars.next===null?'nullptr':hx(vars.next))+'. Это нужно сделать до delete.');
+    vars.current_value=nodes[vars.current].value;
+    S(9,'current_value = '+vars.current_value+'.');
+    const less=vars.current_value<vars.previous_value;
+    S(10,vars.current_value+' < '+vars.previous_value+': '+(less?'да, узел нужно удалить.':'нет, узел остаётся.'));
+    if(less){
+      nodes[vars.last_kept].next=vars.next;
+      S(11,'Узел last_kept теперь ссылается на next. Удаляемый узел отцеплен от списка, но память ещё не освобождена.');
+      nodes[vars.current].deleted=true;
+      S(12,'delete current: память узла освобождена. current стал висячим указателем, пользоваться им нельзя.');
+    }else{
+      vars.last_kept=vars.current;
+      S(14,'last_kept переходит на current: этот узел остаётся в списке.');
+    }
+    vars.previous_value=buggy?nodes[vars.last_kept].value:vars.current_value;
+    S(16,'previous_value = '+vars.previous_value+(buggy?' (из last_kept: так делать нельзя).':(less?'. Узел уже удалён, но это просто число, скопированное до delete, поэтому оно осталось в переменной.':'.')));
+    vars.current=vars.next;
+    S(17,'current = next: переходим к следующему узлу.');
+  }
+  S(19,'Возвращаем head.');
+  const result=[];
+  for(let id=vars.head;id!==null&&result.length<1000;id=nodes[id].next)result.push(nodes[id].value);
+  return {steps,result};
+}
+function reference(vals){
+  return vals.filter((v,i)=>i===0||v>=vals[i-1]);
+}
+function randomList(maxLen){
+  const n=Math.floor(Math.random()*(maxLen+1));
+  return Array.from({length:n},()=>Math.floor(Math.random()*10));
+}
+
+const $=id=>document.getElementById(id);
+let steps=[],idx=0,timer=null,vals=[],lastFail=null;
+
+function load(list){
+  vals=list;
+  $('inp').value=list.join(' ');
+  steps=simulate(vals,$('bug').checked).steps;
+  idx=0;
+  $('sl').max=steps.length-1;
+  stop();
+  render();
+}
+function fmtPtr(st,v){
+  if(v===undefined)return '—';
+  if(v===null)return 'nullptr';
+  const n=st.nodes[v];
+  return '0x'+n.addr.toString(16)+' (узел со значением '+n.value+')'+(n.deleted?' — висячий указатель':'');
+}
+function render(){
+  const st=steps[idx],pv=idx?steps[idx-1]:null;
+  const lines=CODE.slice();
+  if($('bug').checked)lines[16]=BUG_LINE;
+  $('code').innerHTML=lines.map((t,i)=>'<div class="ln'+(i===st.line?' on':'')+'"><i>'+(i+1)+'</i>'+t.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>').join('');
+  $('msg').textContent=st.text;
+  $('cnt').textContent='Шаг '+(idx+1)+' из '+steps.length;
+  $('sl').value=idx;
+  const reach=[];
+  const seen=new Set();
+  for(let id=st.vars.head;id!==null&&id!==undefined&&!seen.has(id);id=st.nodes[id].next){seen.add(id);reach.push(id);}
+  const off=st.nodes.filter(n=>!seen.has(n.id));
+  const card=n=>{
+    const cls=n.deleted?' deleted':(seen.has(n.id)?'':' detached');
+    const chips=PTRS.filter(p=>st.vars[p]===n.id).map(p=>'<span class="chip '+p+'">'+p+'</span>').join('');
+    const nx=n.next===null?'nullptr':'0x'+st.nodes[n.next].addr.toString(16);
+    return '<div class="node'+cls+'"><div class="a">0x'+n.addr.toString(16)+'</div><div class="v">'+n.value+'</div><div class="n">next: '+nx+'</div><div class="chips">'+chips+'</div></div>';
+  };
+  $('chain').innerHTML=reach.length?reach.map(id=>card(st.nodes[id])).join('<span class="arr">→</span>')+'<span class="arr">→</span><span class="nil">nullptr</span>':'<span class="nil">список пуст (head = nullptr)</span>';
+  $('offtitle').textContent=off.length?'Вне списка: пунктирная рамка — узел отцеплен, но ещё не удалён; зачёркнутый — память освобождена':'';
+  $('off').innerHTML=off.map(n=>card(n)).join('');
+  $('vars').innerHTML=ORDER.map(k=>{
+    const v=st.vars[k],isPtr=PTRS.includes(k);
+    const txt=isPtr?fmtPtr(st,v):(v===undefined?'—':v);
+    const old=pv?(isPtr?fmtPtr(pv,pv.vars[k]):(pv.vars[k]===undefined?'—':pv.vars[k])):null;
+    const chg=pv&&String(old)!==String(txt);
+    return '<tr'+(chg?' class="chg"':'')+'><td>'+k+'</td><td class="mono">'+txt+'</td></tr>';
+  }).join('');
+}
+function stop(){if(timer){clearInterval(timer);timer=null;}$('play').textContent='Пуск';}
+function go(d){idx=Math.max(0,Math.min(steps.length-1,idx+d));render();}
+function parse(){return (($('inp').value.match(/-?\d+/g))||[]).map(Number).slice(0,14);}
+
+$('apply').onclick=()=>load(parse());
+$('rnd').onclick=()=>load(randomList(8).concat([]));
+$('bug').onchange=()=>load(vals);
+$('fwd').onclick=()=>{stop();go(1);};
+$('back').onclick=()=>{stop();go(-1);};
+$('first').onclick=()=>{stop();idx=0;render();};
+$('sl').oninput=e=>{stop();idx=Number(e.target.value);render();};
+$('play').onclick=()=>{
+  if(timer){stop();return;}
+  if(idx>=steps.length-1)idx=0;
+  $('play').textContent='Пауза';
+  timer=setInterval(()=>{if(idx>=steps.length-1){stop();return;}go(1);},Number($('spd').value));
+  render();
+};
+$('spd').onchange=()=>{if(timer){stop();$('play').click();}};
+$('run').onclick=()=>{
+  const n=Math.max(1,Math.min(5000,Number($('tn').value)||500));
+  const buggy=$('bug').checked;
+  let pass=0;lastFail=null;
+  for(let i=0;i<n;i++){
+    const list=randomList(10);
+    const got=simulate(list,buggy).result,exp=reference(list);
+    if(got.join(',')===exp.join(','))pass++;else if(!lastFail)lastFail={list,got,exp};
+  }
+  let h='<span class="'+(pass===n?'good':'bad')+'">Прошло '+pass+' из '+n+'.</span>';
+  if(lastFail){
+    h+='<br>Первый провал: список ['+lastFail.list.join(', ')+'], ожидалось ['+lastFail.exp.join(', ')+'], получилось ['+lastFail.got.join(', ')+'].';
+  }else{
+    h+='<br>Результат совпал с эталоном на каждом случайном списке, включая пустые и из одного элемента.';
+  }
+  $('res').innerHTML=h;
+  $('showfail').hidden=!lastFail;
+};
+$('showfail').onclick=()=>{if(lastFail){load(lastFail.list);window.scrollTo({top:0,behavior:'smooth'});}};
+load([5,7,6,9,1,2]);
+</script>
+</body>
+</html>

@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Отладчик кода для списков</title>
+<style>
+:root{--bg:#f6f4ef;--fg:#1d2230;--muted:#6b7285;--card:#fffdf8;--line:#d9d4c7;--code:#fbfaf6;--hl:#ffe9a8;--acc:#2f6fdb;--del:#c8372d;--ok:#1f8f5a;--chg:#fff0c2;--c0:#2f6fdb;--c1:#1f8f5a;--c2:#d9731a;--c3:#8a4fd1;--c4:#b5359a;--c5:#0e8a9a;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171f;--fg:#e8e9ee;--muted:#98a0b3;--card:#1c2029;--line:#2f3544;--code:#181b23;--hl:#5a4a12;--acc:#6aa0ff;--del:#ff7a6e;--ok:#4fd08e;--chg:#4a3d12;--c0:#6aa0ff;--c1:#4fd08e;--c2:#ffa24d;--c3:#b98cf2;--c4:#f07ad6;--c5:#4cd0e0;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#14171f;--fg:#e8e9ee;--muted:#98a0b3;--card:#1c2029;--line:#2f3544;--code:#181b23;--hl:#5a4a12;--acc:#6aa0ff;--del:#ff7a6e;--ok:#4fd08e;--chg:#4a3d12;--c0:#6aa0ff;--c1:#4fd08e;--c2:#ffa24d;--c3:#b98cf2;--c4:#f07ad6;--c5:#4cd0e0;color-scheme:dark}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:940px;margin:0 auto;padding:16px 14px 40px}
+h1{font-size:1.3rem;margin:0 0 4px}h2{font-size:1rem;margin:0 0 8px}
+p.sub{margin:0 0 14px;color:var(--muted)}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.row:first-of-type{margin-top:0}
+button,input,select,textarea{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 12px;min-height:40px}
+button{cursor:pointer}button.primary{background:var(--acc);color:#fff;border-color:transparent}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+textarea{width:100%;min-height:260px;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;resize:vertical;white-space:pre;overflow:auto}
+input[type=text]{flex:1 1 160px;min-width:0}input[type=number]{width:90px}input[type=range]{flex:1 1 140px;padding:0}
+.msg{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--chg);min-height:2.6em}
+.msg.err{background:var(--del);color:#fff}
+.code{background:var(--code);border:1px solid var(--line);border-radius:8px;overflow-x:auto;padding:6px 0;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.ln{display:flex;white-space:pre;padding:0 10px;border-left:3px solid transparent}
+.ln i{display:inline-block;width:2.2em;color:var(--muted);font-style:normal;user-select:none}
+.ln.on{background:var(--hl);border-left-color:var(--c2)}
+.ln.er{background:var(--del);color:#fff}
+.cw{overflow-x:auto;padding:4px 0 6px}
+.chain{display:flex;align-items:flex-start;gap:6px;width:max-content}
+.node{width:112px;border:2px solid var(--line);border-radius:10px;background:var(--bg);padding:6px;text-align:center}
+.node .a,.node .n{font:11px ui-monospace,Menlo,Consolas,monospace;color:var(--muted)}
+.node .v{font-size:1.5rem;font-weight:700;line-height:1.2}
+.node.dead{opacity:.55;border-style:dotted;border-color:var(--del)}.node.dead .v{text-decoration:line-through}
+.arr{align-self:center;font-size:1.4rem;color:var(--muted)}
+.nil{align-self:center;font:12px ui-monospace,Menlo,Consolas,monospace;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-top:4px;min-height:22px}
+.chip{font:11px ui-monospace,Menlo,Consolas,monospace;color:#fff;border-radius:6px;padding:1px 5px;background:var(--c0)}
+.chip.c1{background:var(--c1)}.chip.c2{background:var(--c2)}.chip.c3{background:var(--c3)}.chip.c4{background:var(--c4)}.chip.c5{background:var(--c5)}
+.lbl{font-size:.85rem;color:var(--muted);margin:8px 0 2px}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+td,th{padding:5px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+td.mono{font:12.5px ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere}
+tr.chg td{background:var(--chg)}
+.bad{color:var(--del);font-weight:600}.good{color:var(--ok);font-weight:600}
+ul.pr{margin:6px 0 0;padding-left:20px}
+@media (prefers-reduced-motion:no-preference){.ln,.node{transition:background .15s,border-color .15s}}
+</style>
+</head>
+<body>
+<main>
+<h1>Отладчик кода для списков</h1>
+<p class="sub">Вставь свою функцию на C++ с узлами: она выполнится по шагам, а на каждом шаге будет видно, что произошло, значения переменных и связи узлов. Затем её можно проверить на случайных списках.</p>
+
+<section>
+<h2>Твой код</h2>
+<div class="row"><select id="smp" aria-label="Пример"></select><select id="fn" aria-label="Какую функцию запускать"></select></div>
+<div class="row"><textarea id="src" spellcheck="false" aria-label="Код на C++"></textarea></div>
+<div class="row"><input type="text" id="inp" aria-label="Значения списка через пробел"><input type="text" id="args" placeholder="доп. аргументы (числа)" aria-label="Дополнительные аргументы"></div>
+<div class="row"><button class="primary" id="go">Запустить</button><button id="rnd">Случайный список</button></div>
+<p class="sub" style="margin:8px 0 0">Поддерживается: struct с полями, указатели, new Node{...}, delete, if/else, while, for, return, ->, арифметика и сравнения. Не поддерживаются: ссылки (&amp;), вызовы функций, классы, STL.</p>
+</section>
+
+<section>
+<h2>Выполнение</h2>
+<div class="code" id="code"></div>
+<div class="msg" id="msg" aria-live="polite"></div>
+<div class="row"><button id="first" aria-label="В начало">⏮</button><button id="back">Назад</button><button id="play" class="primary">Пуск</button><button id="fwd">Шаг</button>
+<select id="spd" aria-label="Скорость"><option value="1100">Медленно</option><option value="600" selected>Средне</option><option value="250">Быстро</option></select></div>
+<div class="row"><input type="range" id="sl" min="0" value="0" aria-label="Номер шага"><span id="cnt"></span></div>
+</section>
+
+<section>
+<h2>Список в памяти</h2>
+<div id="mem"></div>
+</section>
+
+<section>
+<h2>Переменные</h2>
+<table><thead><tr><th>Имя</th><th>Значение</th></tr></thead><tbody id="vars"></tbody></table>
+</section>
+
+<section>
+<h2>Итог запуска</h2>
+<div id="sum"></div>
+</section>
+
+<section>
+<h2>Автопроверка на случайных списках</h2>
+<div class="row"><span>Тестов:</span><input type="number" id="tn" value="300" min="1" max="3000"><button class="primary" id="run">Проверить</button><button id="showfail" hidden>Показать провал в отладчике</button></div>
+<div class="row"><input type="text" id="ref" placeholder="эталон на JavaScript, необязательно: a.filter((v,i)=>i==0||v>=a[i-1])" aria-label="Эталон на JavaScript"></div>
+<p class="sub" style="margin:8px 0 0">Проверяются: ошибки выполнения (nullptr, повторное удаление, чтение удалённого узла, бесконечный цикл), утечки памяти, циклы, связи prev у двусвязного списка и, если задан эталон, значения результата.</p>
+<div id="res"></div>
+</section>
+</main>
+
+<script>
+const TYPES=new Set(['int','long','bool','double','float','char','auto','void','size_t','short','unsigned']);
+class RErr extends Error{constructor(m,l){super(m);this.line=l}}
+
+function lex(src){
+  const re=/(\s+|\/\/[^\n]*|\/\*[\s\S]*?\*\/|#[^\n]*|using[^;]*;)|(\d+)|([A-Za-z_]\w*)|(->|==|!=|<=|>=|&&|\|\||\+\+|--|\+=|-=|\*=|\/=|%=|[{}()\[\];,<>=+\-*\/%!&.:?])/y;
+  const out=[];let line=0,m;
+  while(re.lastIndex<src.length){
+    const s=re.lastIndex;m=re.exec(src);
+    if(!m)throw new Error('Неожиданный символ «'+src[s]+'» в строке '+(line+1));
+    if(m[1]===undefined)out.push({t:m[2]?'num':m[3]?'id':'op',v:m[2]||m[3]||m[4],line,s,e:re.lastIndex});
+    line+=(m[0].match(/\n/g)||[]).length;
+  }
+  return out;
+}
+
+function parse(src){
+  const tk=lex(src);let p=0;const structs={},funcs=[];
+  if(!/struct\s+\w+/.test(src)){
+    structs.Node={fields:/\bprev\b/.test(src)?[{n:'value',ptr:false},{n:'prev',ptr:true},{n:'next',ptr:true}]:[{n:'value',ptr:false},{n:'next',ptr:true}]};
+  }
+  const isOp=(v,o=0)=>{const t=tk[p+o];return !!t&&t.t==='op'&&t.v===v};
+  const isId=(v,o=0)=>{const t=tk[p+o];return !!t&&t.t==='id'&&t.v===v};
+  const fail=m=>{const t=tk[p]||tk[tk.length-1];throw new Error(m+(t?' (строка '+(t.line+1)+')':''))};
+  const eat=v=>{if(isOp(v))return tk[p++];fail('Ожидалось «'+v+'»')};
+  const name=()=>{const t=tk[p];if(!t||t.t!=='id')fail('Ожидалось имя');p++;return t.v};
+  const isType=()=>{const t=tk[p];return !!t&&t.t==='id'&&(TYPES.has(t.v)||!!structs[t.v]||t.v==='const'||t.v==='struct')};
+  const mk=(s,n)=>{n.src=src.slice(tk[s].s,tk[p-1].e);return n};
+  const type=()=>{let ref=false;while(isId('const')||isId('struct'))p++;const n=name();let ptr=0;while(isOp('*')||isOp('&')){if(isOp('*'))ptr++;else ref=true;p++}return {n,ptr,ref}};
+  function PR(){const s=p,t=tk[p];if(!t)fail('Неожиданный конец кода');
+    if(t.t==='num'){p++;return mk(s,{k:'num',v:Number(t.v)})}
+    if(t.t==='op'&&t.v==='('){p++;const e=E();eat(')');return mk(s,{k:'par',e})}
+    if(t.t==='id'){
+      if(t.v==='true'||t.v==='false'){p++;return mk(s,{k:'num',v:t.v==='true'?1:0})}
+      if(t.v==='nullptr'||t.v==='NULL'){p++;return mk(s,{k:'null'})}
+      if(t.v==='new'){p++;const ty=name();const close=isOp('{')?'}':'(';if(!isOp('{')&&!isOp('('))fail('После new ожидалось {…} или (…)');p++;const args=[];while(!isOp(close)){args.push(E());if(isOp(','))p++;else if(!isOp(close))fail('Ожидалась запятая')}p++;return mk(s,{k:'new',ty,args})}
+      p++;return mk(s,{k:'id',n:t.v})}
+    fail('Не удалось разобрать выражение')}
+  function PF(){const s=p;let e=PR();for(;;){if(isOp('->')||isOp('.')){p++;const f=name();e=mk(s,{k:'arrow',o:e,f})}else if(isOp('++')||isOp('--')){const op=tk[p++].v;e=mk(s,{k:'post',op,l:e})}else break}return e}
+  function U(){const s=p;if(isOp('!')||isOp('-')){const op=tk[p++].v;const o=U();return mk(s,{k:'un',op,o})}return PF()}
+  function lvl(next,ops){return function(){const s=p;let l=next();while(tk[p]&&tk[p].t==='op'&&ops.includes(tk[p].v)){const op=tk[p++].v;const r=next();l=mk(s,{k:'bin',op,l,r})}return l}}
+  const MUL=lvl(U,['*','/','%']),ADD=lvl(MUL,['+','-']),REL=lvl(ADD,['<','>','<=','>=']),EQ=lvl(REL,['==','!=']),AND=lvl(EQ,['&&']),OR=lvl(AND,['||']);
+  function E(){const s=p;const l=OR();if(tk[p]&&tk[p].t==='op'&&['=','+=','-=','*=','/=','%='].includes(tk[p].v)){const op=tk[p++].v;if(!(l.k==='id'||l.k==='arrow'))fail('Слева от присваивания должна быть переменная или поле');const r=E();return mk(s,{k:'assign',op,l,r})}return l}
+  function decl(){const line=tk[p].line;const ty=type();const items=[];do{const n=name();let init=null;if(isOp('=')){p++;init=E()}items.push({n,init})}while(isOp(',')&&(p++,true));eat(';');return {k:'decl',ty,items,line}}
+  function exprSt(){const line=tk[p].line;const e=E();eat(';');return {k:'expr',e,line}}
+  function simple(){return isType()?decl():exprSt()}
+  function S(){const t=tk[p];if(!t)fail('Неожиданный конец кода');const line=t.line;
+    if(isOp('{')){p++;const body=[];while(!isOp('}')){if(p>=tk.length)fail('Не закрыта скобка {');body.push(S())}p++;return {k:'block',body,line}}
+    if(isOp(';')){p++;return {k:'block',body:[],line}}
+    if(isId('if')){p++;eat('(');const c=E();eat(')');const a=S();let b=null;if(isId('else')){p++;b=S()}return {k:'if',c,a,b,line}}
+    if(isId('while')){p++;eat('(');const c=E();eat(')');return {k:'while',c,b:S(),line}}
+    if(isId('for')){p++;eat('(');const init=isOp(';')?(p++,null):simple();const c=isOp(';')?null:E();eat(';');const st=isOp(')')?null:E();eat(')');return {k:'for',init,c,st,b:S(),line}}
+    if(isId('return')){p++;const e=isOp(';')?null:E();eat(';');return {k:'ret',e,line}}
+    if(isId('delete')){p++;if(isOp('[')){p++;eat(']')}const e=E();eat(';');return {k:'del',e,line}}
+    if(isId('break')||isId('continue')){const k=tk[p++].v;eat(';');return {k,line}}
+    return simple()}
+  while(p<tk.length){
+    if(isId('struct')&&isOp('{',2)){p++;const n=name();eat('{');const fields=[];while(!isOp('}')){const ty=type();do{fields.push({n:name(),ptr:ty.ptr>0})}while(isOp(',')&&(p++,true));eat(';')}p++;if(isOp(';'))p++;structs[n]={fields};continue}
+    const line=tk[p].line;const ret=type();const n=name();eat('(');const params=[];
+    if(isId('void')&&isOp(')',1))p++;
+    else if(!isOp(')'))do{const pt=type();if(pt.ref)fail('Параметры-ссылки (&) пока не поддерживаются');params.push({ty:pt,n:name()})}while(isOp(',')&&(p++,true));
+    eat(')');if(!isOp('{'))fail('Ожидалось тело функции {…}');const body=S();funcs.push({n,ret,params,body,line,end:tk[p-1].line});
+  }
+  return {structs,funcs};
+}
+
+function runCode(prog,fn,vals,args){
+  const sd=prog.structs[fn.params[0]&&fn.params[0].ty.n];
+  if(!sd||fn.params[0].ty.ptr!==1)throw new Error('Первый параметр функции должен быть указателем на узел, например Node* head');
+  const dataF=(sd.fields.find(f=>!f.ptr)||{}).n;
+  const ptrs=sd.fields.filter(f=>f.ptr);
+  const nextF=(ptrs.find(f=>f.n==='next')||ptrs[0]||{}).n;
+  const prevF=(ptrs.find(f=>f.n==='prev')||{}).n;
+  if(!nextF)throw new Error('В структуре нет указателя на следующий узел (поле next)');
+  const nodes=[],steps=[],env=new Map();let ticks=0;
+  const P=id=>({p:id}),isP=v=>v!==null&&typeof v==='object';
+  const hx=n=>'0x'+n.addr.toString(16);
+  const mkNode=(ty,f)=>{const id=nodes.length;const n={id,ty,addr:0x1000+((id*37+11)%251)*16,f:{},deleted:false};for(const fd of prog.structs[ty].fields)n.f[fd.n]=fd.ptr?P(null):0;Object.assign(n.f,f);nodes.push(n);return n};
+  const dataOf=n=>n.f[dataF];
+  const fmtv=v=>{if(v===undefined)return '—';if(!isP(v))return String(v);if(v.p===null)return 'nullptr';const n=nodes[v.p];return hx(n)+' (узел со значением '+dataOf(n)+')'+(n.deleted?', УЖЕ УДАЛЁН':'')};
+  const snap=()=>({nodes:nodes.map(n=>({id:n.id,addr:n.addr,f:{...n.f},deleted:n.deleted})),vars:[...env].map(([k,v])=>({n:k,ptr:v.ty.ptr>0,val:v.val}))});
+  const rec=(line,text,err)=>steps.push({line,text,err:!!err,...snap()});
+  const tick=l=>{if(++ticks>5000)throw new RErr('Слишком много шагов: возможно, бесконечный цикл',l)};
+  const node=(v,what,line)=>{
+    if(!isP(v))throw new RErr('«'+what+'» не указатель',line);
+    if(v.p===null)throw new RErr('Обращение через nullptr: «'+what+'» пустой указатель, у него нет узла и полей',line);
+    const n=nodes[v.p];if(n.deleted)throw new RErr('Обращение к узлу '+hx(n)+', который уже удалён (use-after-delete)',line);return n};
+  const truthy=v=>isP(v)?v.p!==null:!!v;
+  let curLine=0;
+  function ev(e){
+    switch(e.k){
+      case 'num':return e.v;
+      case 'null':return P(null);
+      case 'par':return ev(e.e);
+      case 'id':{const v=env.get(e.n);if(!v)throw new RErr('Переменная «'+e.n+'» не объявлена',curLine);if(v.val===undefined)throw new RErr('Переменная «'+e.n+'» не инициализирована',curLine);return v.val}
+      case 'arrow':{const n=node(ev(e.o),e.o.src,curLine);if(!(e.f in n.f))throw new RErr('У узла нет поля «'+e.f+'»',curLine);return n.f[e.f]}
+      case 'new':{const fl=prog.structs[e.ty];if(!fl)throw new RErr('Неизвестный тип «'+e.ty+'»',curLine);const f={};e.args.forEach((a,i)=>{if(fl.fields[i])f[fl.fields[i].n]=ev(a)});return P(mkNode(e.ty,f).id)}
+      case 'un':{const v=ev(e.o);return e.op==='!'?(truthy(v)?0:1):-v}
+      case 'assign':case 'post':return doAssign(e).nw;
+      case 'bin':{
+        if(e.op==='&&'){const a=ev(e.l);return truthy(a)?(truthy(ev(e.r))?1:0):0}
+        if(e.op==='||'){const a=ev(e.l);return truthy(a)?1:(truthy(ev(e.r))?1:0)}
+        const a=ev(e.l),b=ev(e.r);
+        if(isP(a)||isP(b)){
+          if(e.op!=='=='&&e.op!=='!=')throw new RErr('Для указателей допустимы только == и !=',curLine);
+          const pa=isP(a)?a.p:(a===0?null:a),pb=isP(b)?b.p:(b===0?null:b);return (e.op==='=='?pa===pb:pa!==pb)?1:0}
+        return calc(e.op,a,b)}
+    }
+    throw new RErr('Неподдерживаемое выражение',curLine)}
+  function calc(op,a,b){
+    switch(op){
+      case '+':return a+b;case '-':return a-b;case '*':return a*b;
+      case '/':if(b===0)throw new RErr('Деление на ноль',curLine);return Math.trunc(a/b);
+      case '%':if(b===0)throw new RErr('Деление на ноль',curLine);return a%b;
+      case '<':return a<b?1:0;case '>':return a>b?1:0;case '<=':return a<=b?1:0;case '>=':return a>=b?1:0;
+      case '==':return a===b?1:0;case '!=':return a!==b?1:0}}
+  function doAssign(e){
+    const l=e.l;let nw,op=e.op;
+    if(e.k==='post'){op=e.op==='++'?'+=':'-='}
+    const target=()=>{
+      if(l.k==='id'){const v=env.get(l.n);if(!v)throw new RErr('Переменная «'+l.n+'» не объявлена',curLine);return {get:()=>v.val,set:x=>{v.val=x},what:l.n,var:true}}
+      const n=node(ev(l.o),l.o.src,curLine);if(!(l.f in n.f))throw new RErr('У узла нет поля «'+l.f+'»',curLine);
+      return {get:()=>n.f[l.f],set:x=>{n.f[l.f]=x},what:'поле '+l.f+' узла '+hx(n),isLink:ptrs.some(f=>f.n===l.f)}};
+    const rhs=e.k==='post'?1:ev(e.r);
+    const t=target();const old=t.get();
+    nw=op==='='?rhs:calc(op[0],old,rhs);t.set(nw);
+    let d=e.src+': '+t.what+' — было '+fmtv(old)+', стало '+fmtv(nw)+'.';
+    if(t.var&&isP(nw))d+=' Переменная-указатель хранит адрес, поэтому теперь она указывает на другой узел, а сами узлы не изменились.';
+    if(t.isLink)d+=' Так меняются связи списка: стрелка этого узла перенаправлена.';
+    return {nw,desc:d}}
+  function exec(s){
+    curLine=s.line;tick(s.line);
+    switch(s.k){
+      case 'block':for(const x of s.body){const r=exec(x);if(r)return r}return;
+      case 'decl':for(const it of s.items){curLine=s.line;const val=it.init?ev(it.init):undefined;env.set(it.n,{ty:s.ty,val});
+        rec(s.line,'Объявлена переменная '+it.n+(it.init?' = '+it.init.src+' → '+fmtv(val)+'.'+(s.ty.ptr&&isP(val)?' Указатель хранит адрес узла, а не сам узел.':''):' без начального значения.'))}return;
+      case 'expr':{const e=s.e;if(e.k==='assign'||e.k==='post'){rec(s.line,doAssign(e).desc)}else{ev(e);rec(s.line,'Выполнено выражение '+e.src+'.')}return}
+      case 'if':{const c=truthy(ev(s.c));rec(s.line,'Условие ('+s.c.src+') '+(c?'истинно: выполняется ветка if.':'ложно: '+(s.b?'выполняется ветка else.':'ветка if пропускается.')));if(c)return exec(s.a);if(s.b)return exec(s.b);return}
+      case 'while':for(;;){curLine=s.line;const c=truthy(ev(s.c));rec(s.line,'Проверка условия цикла ('+s.c.src+') → '+(c?'истинно, выполняем тело.':'ложно, цикл закончен.'));if(!c)break;const r=exec(s.b);if(r==='break')break;if(r&&r!=='continue')return r}return;
+      case 'for':{if(s.init)exec(s.init);for(;;){curLine=s.line;const c=s.c?truthy(ev(s.c)):true;rec(s.line,'Проверка условия цикла for'+(s.c?' ('+s.c.src+')':'')+' → '+(c?'истинно.':'ложно, цикл закончен.'));if(!c)break;const r=exec(s.b);if(r==='break')break;if(r&&r!=='continue')return r;if(s.st){curLine=s.line;const d=(s.st.k==='assign'||s.st.k==='post')?doAssign(s.st).desc:(ev(s.st),'Выполнено '+s.st.src);rec(s.line,'Шаг цикла: '+d)}}return}
+      case 'ret':{const v=s.e?ev(s.e):undefined;rec(s.line,'return'+(s.e?' '+s.e.src+' → '+fmtv(v):'')+'. Функция завершена.');return {ret:v}}
+      case 'del':{const v=ev(s.e);if(!isP(v))throw new RErr('delete применяется к указателю',s.line);
+        if(v.p===null){rec(s.line,'delete '+s.e.src+': указатель пустой (nullptr), ничего не происходит.');return}
+        const n=nodes[v.p];if(n.deleted)throw new RErr('Повторное удаление узла '+hx(n)+' (double free)',s.line);
+        n.deleted=true;rec(s.line,'delete '+s.e.src+': память узла '+hx(n)+' (значение '+dataOf(n)+') освобождена. Указатель '+s.e.src+' теперь висячий: он хранит старый адрес, но читать по нему нельзя.');return}
+      case 'break':case 'continue':rec(s.line,s.k==='break'?'break: выходим из цикла.':'continue: переходим к следующей проверке цикла.');return s.k;
+    }}
+  vals.forEach((v,i)=>{const n=mkNode(fn.params[0].ty.n,{[dataF]:v});if(i>0){nodes[i-1].f[nextF]=P(n.id);if(prevF)n.f[prevF]=P(i-1)}});
+  const first=nodes.length?P(0):P(null);
+  env.set(fn.params[0].n,{ty:fn.params[0].ty,val:first});
+  fn.params.slice(1).forEach((pr,i)=>env.set(pr.n,{ty:pr.ty,val:args[i]===undefined?0:args[i]}));
+  let error=null,retVal;
+  rec(fn.line,'Вызов функции '+fn.n+': параметр '+fn.params[0].n+' = '+fmtv(first)+'. Список из '+vals.length+' элементов уже создан в памяти.');
+  try{const r=exec(fn.body);if(r&&r.ret!==undefined)retVal=r.ret;if(!r||r.ret===undefined)rec(fn.end,'Функция дошла до конца без return.')}
+  catch(e){if(!(e instanceof RErr))throw e;error=e.message;rec(e.line,'ОШИБКА: '+e.message,true)}
+  const problems=[];if(error)problems.push(error);
+  let start=(fn.ret.ptr>0&&retVal!==undefined)?retVal:first;
+  const result=[],seen=new Set();let id=isP(start)?start.p:null,prevId=null;
+  while(id!==null&&!error){
+    if(seen.has(id)){problems.push('В результате есть цикл: узел '+hx(nodes[id])+' встречается дважды');break}
+    const n=nodes[id];if(n.deleted){problems.push('В списке остался удалённый узел '+hx(n)+' (висячая ссылка)');break}
+    if(prevF&&n.f[prevF].p!==prevId)problems.push('Связь '+prevF+' узла '+hx(n)+' указывает не на предыдущий узел');
+    seen.add(id);result.push(dataOf(n));prevId=id;id=n.f[nextF].p}
+  if(!error){const leaks=nodes.filter(n=>!n.deleted&&!seen.has(n.id));if(leaks.length)problems.push('Утечка памяти: '+leaks.length+' узл. не удалены и недостижимы ('+leaks.map(n=>dataOf(n)).join(', ')+')')}
+  return {steps,result,problems,error,meta:{nextF,prevF,dataF,firstVar:fn.params[0].n}};
+}
+
+const $=id=>document.getElementById(id);
+const SAMPLES={
+"Удалить элементы меньше предыдущего":{list:"5 7 6 9 1 2",ref:"a.filter((v,i)=>i==0||v>=a[i-1])",code:`struct Node {
+  int value;
+  Node* next;
+};
+
+Node* remove_smaller_than_previous(Node* head) {
+  if (head == nullptr) {
+    return nullptr;
+  }
+  int previous_value = head->value;
+  Node* last_kept = head;
+  Node* current = head->next;
+  while (current != nullptr) {
+    Node* next = current->next;
+    const int current_value = current->value;
+    if (current_value < previous_value) {
+      last_kept->next = next;
+      delete current;
+    } else {
+      last_kept = current;
+    }
+    previous_value = current_value;
+    current = next;
+  }
+  return head;
+}`},
+"Добавить 0 после отрицательных":{list:"3 -7 8",ref:"a.flatMap(v=>v<0?[v,0]:[v])",code:`struct Node {
+  int value;
+  Node* next;
+};
+
+Node* add_zero_after_negative(Node* head) {
+  Node* current = head;
+  while (current != nullptr) {
+    if (current->value < 0) {
+      Node* zero = new Node{0, current->next};
+      current->next = zero;
+      current = zero;
+    }
+    current = current->next;
+  }
+  return head;
+}`},
+"Двусвязный: вставить -x перед чётным > 10":{list:"12 3 20 11 14 8",ref:"a.flatMap(v=>v>10&&v%2==0?[-v,v]:[v])",code:`struct DNode {
+  int value;
+  DNode* prev;
+  DNode* next;
+};
+
+DNode* insert_opposite_before_big_even(DNode* head) {
+  DNode* current = head;
+  while (current != nullptr) {
+    if (current->value > 10 && current->value % 2 == 0) {
+      DNode* node = new DNode{-current->value, current->prev, current};
+      if (current->prev != nullptr) {
+        current->prev->next = node;
+      } else {
+        head = node;
+      }
+      current->prev = node;
+    }
+    current = current->next;
+  }
+  return head;
+}`}};
+let prog=null,res=null,steps=[],idx=0,timer=null,lastFail=null,srcLines=[];
+
+function esc(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+function compile(){
+  try{prog=parse($('src').value)}catch(e){prog=null;showErr(e.message);return false}
+  const cand=prog.funcs.filter(f=>f.params.length&&f.params[0].ty.ptr===1);
+  if(!cand.length){showErr('Не найдено функции, у которой первый параметр указатель на узел (например, Node* head)');return false}
+  const keep=$('fn').value;
+  $('fn').innerHTML=cand.map(f=>'<option>'+f.n+'</option>').join('');
+  $('fn').value=cand.some(f=>f.n===keep)?keep:cand[cand.length-1].n;
+  return true}
+function showErr(m){
+  steps=[{line:-1,text:'Не удалось разобрать код: '+m,err:true,nodes:[],vars:[]}];idx=0;res=null;
+  $('sl').max=0;stop();render()}
+function nums(s){return (s.match(/-?\d+/g)||[]).map(Number)}
+function launch(){
+  if(!compile())return;
+  const fn=prog.funcs.find(f=>f.n===$('fn').value);
+  try{res=runCode(prog,fn,nums($('inp').value).slice(0,14),nums($('args').value))}
+  catch(e){showErr(e.message);return}
+  steps=res.steps;idx=0;$('sl').max=steps.length-1;stop();render()}
+function ptrOf(st,name){const v=st.vars.find(x=>x.n===name);return v&&v.ptr&&v.val&&v.val.p!==undefined?v.val.p:null}
+function render(){
+  const st=steps[idx];srcLines=$('src').value.split('\n');
+  $('code').innerHTML=srcLines.map((t,i)=>'<div class="ln'+(i===st.line?(st.err?' er':' on'):'')+'"><i>'+(i+1)+'</i>'+esc(t)+'</div>').join('');
+  $('msg').textContent=st.text;$('msg').className='msg'+(st.err?' err':'');
+  $('cnt').textContent='Шаг '+(idx+1)+' из '+steps.length;$('sl').value=idx;
+  if(!res){$('mem').innerHTML='';$('vars').innerHTML='';$('sum').innerHTML='';return}
+  const M=res.meta,names=[];
+  steps.forEach(s=>s.vars.forEach(v=>{if(v.ptr&&!names.includes(v.n))names.push(v.n)}));
+  const card=n=>{
+    const chips=names.filter(k=>ptrOf(st,k)===n.id).map(k=>'<span class="chip c'+(names.indexOf(k)%6)+'">'+esc(k)+'</span>').join('');
+    const show=p=>p.p===null?'nullptr':'0x'+st.nodes[p.p].addr.toString(16);
+    return '<div class="node'+(n.deleted?' dead':'')+'"><div class="a">0x'+n.addr.toString(16)+'</div><div class="v">'+n.f[M.dataF]+'</div><div class="n">next: '+show(n.f[M.nextF])+'</div>'+(M.prevF?'<div class="n">prev: '+show(n.f[M.prevF])+'</div>':'')+'<div class="chips">'+chips+'</div></div>'};
+  const alive=st.nodes.filter(n=>!n.deleted),inc=new Set();
+  alive.forEach(n=>{const p=n.f[M.nextF];if(p.p!==null&&!st.nodes[p.p].deleted)inc.add(p.p)});
+  let starts=alive.filter(n=>!inc.has(n.id));const seen=new Set(),rows=[];
+  const mainId=ptrOf(st,M.firstVar);
+  const chainFrom=n=>{const c=[];let x=n;while(x&&!seen.has(x.id)&&!x.deleted){seen.add(x.id);c.push(x);const p=x.f[M.nextF].p;x=p===null?null:st.nodes[p]}return c};
+  const mainStart=starts.find(s=>{let x=s,g=0;while(x&&g++<60){if(x.id===mainId)return true;const p=x.f[M.nextF].p;x=p===null?null:st.nodes[p]}return false});
+  if(mainStart)starts=[mainStart,...starts.filter(s=>s!==mainStart)];
+  starts.forEach(s=>{const c=chainFrom(s);if(c.length)rows.push(c)});
+  const rest=alive.filter(n=>!seen.has(n.id));if(rest.length)rows.push(rest);
+  const dead=st.nodes.filter(n=>n.deleted);
+  let h='';
+  rows.forEach((c,i)=>{
+    const last=c[c.length-1],lp=last.f[M.nextF].p;
+    h+='<div class="lbl">'+(i===0?'Основной список':'Отцеплено: на эти узлы никто не ссылается через next')+'</div><div class="cw"><div class="chain">'+c.map(card).join('<span class="arr">→</span>')+(lp===null?'<span class="arr">→</span><span class="nil">nullptr</span>':'')+'</div></div>'});
+  if(!rows.length)h+='<div class="lbl">Живых узлов нет (список пуст)</div>';
+  if(dead.length)h+='<div class="lbl">Удалены через delete (память освобождена)</div><div class="cw"><div class="chain">'+dead.map(card).join('')+'</div></div>';
+  $('mem').innerHTML=h;
+  const pv=idx?steps[idx-1]:null;
+  const fv=(s,v)=>{if(v.val===undefined)return '—';if(v.ptr&&v.val.p!==undefined){if(v.val.p===null)return 'nullptr';const n=s.nodes[v.val.p];return '0x'+n.addr.toString(16)+' (узел со значением '+n.f[M.dataF]+')'+(n.deleted?' — висячий указатель':'')}return String(v.val)};
+  $('vars').innerHTML=st.vars.map(v=>{const o=pv&&pv.vars.find(x=>x.n===v.n);const chg=pv&&(!o||fv(pv,o)!==fv(st,v));return '<tr'+(chg?' class="chg"':'')+'><td>'+esc(v.n)+'</td><td class="mono">'+esc(fv(st,v))+'</td></tr>'}).join('');
+  $('sum').innerHTML='<div>Результат: <b>['+res.result.join(', ')+']</b></div>'+(res.problems.length?'<ul class="pr bad">'+res.problems.map(p=>'<li>'+esc(p)+'</li>').join('')+'</ul>':'<div class="good">Проблем с памятью и связями не найдено.</div>')}
+function stop(){if(timer){clearInterval(timer);timer=null}$('play').textContent='Пуск'}
+function go(d){idx=Math.max(0,Math.min(steps.length-1,idx+d));render()}
+
+$('smp').innerHTML=Object.keys(SAMPLES).map(k=>'<option>'+k+'</option>').join('');
+$('smp').onchange=()=>{const s=SAMPLES[$('smp').value];$('src').value=s.code;$('inp').value=s.list;$('ref').value=s.ref;$('fn').innerHTML='';launch()};
+$('go').onclick=launch;
+$('fn').onchange=launch;
+$('rnd').onclick=()=>{$('inp').value=randList(8).join(' ');launch()};
+$('fwd').onclick=()=>{stop();go(1)};$('back').onclick=()=>{stop();go(-1)};$('first').onclick=()=>{stop();idx=0;render()};
+$('sl').oninput=e=>{stop();idx=Number(e.target.value);render()};
+$('play').onclick=()=>{if(timer){stop();return}if(idx>=steps.length-1)idx=0;$('play').textContent='Пауза';timer=setInterval(()=>{if(idx>=steps.length-1){stop();return}go(1)},Number($('spd').value));render()};
+$('spd').onchange=()=>{if(timer){stop();$('play').click()}};
+function randList(m){const n=Math.floor(Math.random()*(m+1));return Array.from({length:n},()=>Math.floor(Math.random()*21)-5)}
+$('run').onclick=()=>{
+  if(!compile())return;
+  const fn=prog.funcs.find(f=>f.n===$('fn').value),n=Math.max(1,Math.min(3000,Number($('tn').value)||300)),args=nums($('args').value);
+  let refFn=null,refErr='';
+  if($('ref').value.trim()){try{refFn=new Function('a','return ('+$('ref').value+')')}catch(e){refErr='Эталон не разобран: '+e.message}}
+  let pass=0,shown=[];lastFail=null;
+  for(let i=0;i<n;i++){
+    const list=randList(8);let r,why=[];
+    try{r=runCode(prog,fn,list,args);why=r.problems.slice();
+      if(refFn&&!r.error){const exp=refFn(list.slice());if(String(exp)!==String(r.result))why.push('Ожидалось ['+exp.join(', ')+'], получилось ['+r.result.join(', ')+']')}}
+    catch(e){why=[e.message]}
+    if(!why.length)pass++;else if(!lastFail)lastFail={list,why};
+    if(shown.length<6||(why.length&&shown.filter(s=>s.why.length).length<3))if(shown.length<9)shown.push({list,out:r?r.result:[],why})}
+  let h='<p><span class="'+(pass===n?'good':'bad')+'">Прошло '+pass+' из '+n+'.</span> '+esc(refErr)+(refFn?'':' Эталон не задан: проверялись только ошибки памяти и связи.')+'</p>';
+  h+='<table><thead><tr><th>Вход</th><th>Выход</th><th>Итог</th></tr></thead><tbody>'+shown.map(s=>'<tr><td class="mono">['+s.list.join(', ')+']</td><td class="mono">['+s.out.join(', ')+']</td><td>'+(s.why.length?'<span class="bad">'+esc(s.why.join('; '))+'</span>':'<span class="good">верно</span>')+'</td></tr>').join('')+'</tbody></table>';
+  $('res').innerHTML=h;$('showfail').hidden=!lastFail};
+$('showfail').onclick=()=>{if(lastFail){$('inp').value=lastFail.list.join(' ');launch();window.scrollTo({top:0,behavior:'smooth'})}};
+$('smp').value=Object.keys(SAMPLES)[0];$('smp').onchange();
+</script>
+</body>
+</html>
